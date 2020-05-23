@@ -1,10 +1,9 @@
-#ifndef CONTROLLER_H
-#define CONTROLLER_H
+#ifndef CONTROLLER_HPP
+#define CONTROLLER_HPP
 
-//#include "enums.h"
+#include "simulator.hpp"
+#include <stdio.h>
 
-//SignalState *controller_update(const VehicleSensors sensors);
-void controller_update(void);
+SignalState *controller_update(const SensorState *sensors, int sensors_size, SignalState *signals, int signals_size);
 
-
-#endif // CONTROLLER_H
+#endif // CONTROLLER_HPP

@@ -40,10 +40,27 @@ int main
             break;
         }
 
-         controller_update();
-        // simulator.update_signals(...);
+        // Extract array from sensors from simulator.
+        const SensorState *c_sensors = sensors.data();
 
+        // Pass sensors into controller. Get signals from controller.
+        TrafficSignals testsignals;
+        for (unsigned lane = 0; lane < Lane::COUNT; ++lane)
+        {
+            testsignals[lane] = SignalState::YELLOW;
+        }
+        SignalState *c_signals = testsignals.data();
+        c_signals = controller_update(c_sensors, sensors.size(), c_signals, testsignals.size());
+
+        // Convert c_signals to signals somehow.
+
+        // Pass signals into simulator.
+        simulator.update_lane_signals(testsignals);
+
+        // Let simulator print simulator state.
         std::cout << simulator << std::endl;
         simulator.advance(TIME_STEP);
+
+        // TODO write tests for everything.
     }
 }
