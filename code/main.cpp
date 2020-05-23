@@ -30,6 +30,7 @@ int main
     Simulator simulator(SCENARIO_2);
     auto &clock = simulator.clock();
     auto &sensors = simulator.sensors();
+    controller_init();
 
     std::cout << simulator.BANNER << std::endl;
 
@@ -50,7 +51,7 @@ int main
             testsignals[lane] = SignalState::YELLOW;
         }
         SignalState *c_signals = testsignals.data();
-        c_signals = controller_update(c_sensors, sensors.size(), c_signals, testsignals.size());
+        c_signals = controller_update(c_sensors, sensors.size(), c_signals, testsignals.size(), clock.now());
 
         // Convert c_signals to signals somehow.
 
