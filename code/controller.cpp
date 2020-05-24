@@ -24,6 +24,14 @@
 //===================================== Private Variables =======================================//
 //===============================================================================================//
 
+static lane_t init = {
+    "INIT",    // .name
+    0,           // .min_signal_time
+    0,           // .max_signal_time
+    {0, 0},       // .sensor_indices
+    {0, 0},       // .signal_indices
+    NULL          // .next_lane
+};
 static lane_t ns_turn = {
     "NS_TURN",    // .name
     10,           // .min_signal_time
@@ -61,7 +69,6 @@ static lane_t ew_through = {
 //===============================================================================================//
 //===================================== Private Functions =======================================//
 //===============================================================================================//
-
 static void turn_lane_red(const lane_t *current_lane, SignalState *signals) {
     int signal0 = current_lane->signal_indices[0];
     int signal1 = current_lane->signal_indices[1];
@@ -80,7 +87,23 @@ static void turn_lane_green(const lane_t *current_lane, SignalState *signals) {
     printf("turn green: %d %d\n", signal0, signal1);
 }
 
+static void switch_to_next_lane(traffic_state_t *traffic_state, int sim_time) {
+    turn_lane_red(traffic_state->current_lane, traffic_state->signal_data);
+
+    traffic_state->current_lane = traffic_state->current_lane->next_lane; // TODO make this a function that does more advanced switching logic.
+
+    turn_lane_green(traffic_state->current_lane, traffic_state->signal_data);
+
+    traffic_state->lane_start_time = sim_time;
+
+    printf("Switched to lane %s at time %d. min: %d, max: %d\n",
+            traffic_state->current_lane->name, sim_time,
+            traffic_state->current_lane->min_signal_time,
+            traffic_state->current_lane->max_signal_time);
+}
+
 static void controller_init(void) {
+    init.next_lane = &ns_turn;
     ns_turn.next_lane = &ns_through;
     ns_through.next_lane = &ew_turn;
     ew_turn.next_lane = &ew_through;
@@ -94,12 +117,14 @@ static void controller_init(void) {
 // TODO check if sensors are initialized.
 void traffic_init(traffic_state_t *traffic_state, int sim_time) {
     controller_init();
-    traffic_state->current_lane = &ns_turn;
+    traffic_state->current_lane = &init;
     traffic_state->lane_start_time = sim_time;
+
     for(int i=0; i<traffic_state->signals_size; i++) {
         traffic_state->signal_data[i] = SignalState::RED;
     }
-    turn_lane_green(traffic_state->current_lane, traffic_state->signal_data);
+
+    switch_to_next_lane(traffic_state, sim_time);
 }
 
 // Level 1: Follow traffic order.
@@ -126,16 +151,7 @@ void controller_update(traffic_state_t *traffic_state, int sim_time) {
     // Is it time to switch lanes?
     if( max_time_elapsed || (min_time_elapsed && both_sensors_are_clear) ) {
         // Switch lanes.
-        
-        turn_lane_red(traffic_state->current_lane, traffic_state->signal_data);
-
-        traffic_state->current_lane = current_lane->next_lane; // TODO make this a function that does more advanced switching logic.
-
-        turn_lane_green(traffic_state->current_lane, traffic_state->signal_data);
-
-        traffic_state->lane_start_time = sim_time;
-
-        printf("Switched to lane %s at time %d. min: %d, max: %d\n", current_lane->name, sim_time, current_lane->min_signal_time, current_lane->max_signal_time);
+        switch_to_next_lane(traffic_state, sim_time);
     }
 } 
 

@@ -27,7 +27,7 @@ int main
     char const *argv[]
 )
 {
-    Simulator simulator(SCENARIO_1);
+    Simulator simulator(SCENARIO_2);
     auto &clock = simulator.clock();
     auto &sensors = simulator.sensors();
 
