@@ -21,17 +21,23 @@
 #include "controller.hpp"
 
 //===============================================================================================//
+//===================================== Defines and Typedefs ====================================//
+//===============================================================================================//
+// Helpful error handling macro.
+#define CHECK(arg, fmt, ...) {if(!(arg)) {printf("ERROR: " fmt "\n", ##__VA_ARGS__); goto error; } }
+
+//===============================================================================================//
 //===================================== Private Variables =======================================//
 //===============================================================================================//
 
-static lane_t init = {
-    "INIT",    // .name
-    0,           // .min_signal_time
-    0,           // .max_signal_time
-    {0, 0},       // .sensor_indices
-    {0, 0},       // .signal_indices
-    NULL          // .next_lane
-};
+//static lane_t init = {
+    //"INIT",    // .name
+    //0,           // .min_signal_time
+    //0,           // .max_signal_time
+    //{0, 0},       // .sensor_indices
+    //{0, 0},       // .signal_indices
+    //NULL          // .next_lane
+//};
 static lane_t ns_turn = {
     "NS_TURN",    // .name
     10,           // .min_signal_time
@@ -75,7 +81,7 @@ static void turn_lane_red(const lane_t *current_lane, SignalState *signals) {
 
     signals[signal0] = SignalState::RED;
     signals[signal1] = SignalState::RED;
-    printf("turn red: %d %d\n", signal0, signal1);
+    //printf("turn red: %d %d\n", signal0, signal1);
 }
 
 static void turn_lane_green(const lane_t *current_lane, SignalState *signals) {
@@ -84,13 +90,13 @@ static void turn_lane_green(const lane_t *current_lane, SignalState *signals) {
 
     signals[signal0] = SignalState::GREEN;
     signals[signal1] = SignalState::GREEN;
-    printf("turn green: %d %d\n", signal0, signal1);
+    //printf("turn green: %d %d\n", signal0, signal1);
 }
 
-static void switch_to_next_lane(traffic_state_t *traffic_state, int sim_time) {
+static void switch_to_lane(traffic_state_t *traffic_state, const lane_t *new_lane, int sim_time) {
     turn_lane_red(traffic_state->current_lane, traffic_state->signal_data);
 
-    traffic_state->current_lane = traffic_state->current_lane->next_lane; // TODO make this a function that does more advanced switching logic.
+    traffic_state->current_lane = new_lane;
 
     turn_lane_green(traffic_state->current_lane, traffic_state->signal_data);
 
@@ -103,12 +109,34 @@ static void switch_to_next_lane(traffic_state_t *traffic_state, int sim_time) {
 }
 
 static void controller_init(void) {
-    init.next_lane = &ns_turn;
     ns_turn.next_lane = &ns_through;
     ns_through.next_lane = &ew_turn;
     ew_turn.next_lane = &ew_through;
     ew_through.next_lane = &ns_turn;
 }
+
+static const lane_t *find_next_lane_with_set_sensors(traffic_state_t *traffic_state, int sim_time) {
+    const lane_t *new_lane = traffic_state->current_lane->next_lane;
+
+    // Search through linked-list for next lane with set sensors.
+    while(1) {
+        //printf("new_lane is %p. current_lane is %p\n", new_lane, traffic_state->current_lane);
+        //CHECK(new_lane != traffic_state->current_lane, "controller looped through all lanes and didn't find any with sensors set.");
+        
+        SensorState sensor0 = traffic_state->sensor_data[new_lane->sensor_indices[0]];
+        SensorState sensor1 = traffic_state->sensor_data[new_lane->sensor_indices[1]];
+        bool both_sensors_are_clear = ( (sensor0 == SensorState::CLEAR) && 
+                                        (sensor1 == SensorState::CLEAR) );
+
+        if(both_sensors_are_clear) {
+            new_lane = new_lane->next_lane;
+        } else {
+            //printf("found lane\n");
+            return new_lane;
+        }
+    }
+}
+
 
 //===============================================================================================//
 //====================================== Public Functions =======================================//
@@ -117,14 +145,12 @@ static void controller_init(void) {
 // TODO check if sensors are initialized.
 void traffic_init(traffic_state_t *traffic_state, int sim_time) {
     controller_init();
-    traffic_state->current_lane = &init;
-    traffic_state->lane_start_time = sim_time;
 
     for(int i=0; i<traffic_state->signals_size; i++) {
         traffic_state->signal_data[i] = SignalState::RED;
     }
 
-    switch_to_next_lane(traffic_state, sim_time);
+    switch_to_lane(traffic_state, &ns_turn, sim_time);
 }
 
 // Level 1: Follow traffic order.
@@ -150,8 +176,28 @@ void controller_update(traffic_state_t *traffic_state, int sim_time) {
 
     // Is it time to switch lanes?
     if( max_time_elapsed || (min_time_elapsed && both_sensors_are_clear) ) {
-        // Switch lanes.
-        switch_to_next_lane(traffic_state, sim_time);
+        // are all sensors clear?
+        bool all_sensors_clear = true;
+        for(int i=0; i<traffic_state->sensors_size; i++) {
+            if(traffic_state->sensor_data[i] == SensorState::SET) {
+                all_sensors_clear = false;
+                break;
+            }
+        }
+        // if all sensors are clear, favor ns_through
+        if(all_sensors_clear) {
+            switch_to_lane(traffic_state, &ns_through, sim_time);
+
+        } else { // otherwise, seek next lane in rotation with set sensors.
+            // Switch lanes.
+            const lane_t *new_lane = find_next_lane_with_set_sensors(traffic_state, sim_time);
+
+            if(new_lane != traffic_state->current_lane) {
+                switch_to_lane(traffic_state, new_lane, sim_time);
+            }
+        }
     }
+error:
+    return;
 } 
 
