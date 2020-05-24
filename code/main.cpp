@@ -31,9 +31,14 @@ int main
     auto &clock = simulator.clock();
     auto &sensors = simulator.sensors();
 
+    TrafficSignals signals;
+
     traffic_state_t traffic_state;
-    traffic_state.sensors = sensors.data();
-    traffic_init(&traffic_state);
+    traffic_state.sensor_data = sensors.data();
+    traffic_state.sensors_size = sensors.size();
+    traffic_state.signal_data = signals.data();
+    traffic_state.signals_size = signals.size();
+    traffic_init(&traffic_state, clock.now());
 
 
     std::cout << simulator.BANNER << std::endl;
@@ -45,11 +50,9 @@ int main
             break;
         }
 
-        // Extract array from sensors from simulator.
-        const SensorState *c_sensors = sensors.data();
-
-        // Pass sensors into controller. Get signals from controller.
-        controller_update(c_sensors, sensors.size(), c_signals, signals.size(), clock.now());
+        // Pass traffic state into controller. controller will update signals array via 
+        // traffic_state.signal_data ptr
+        controller_update(&traffic_state, clock.now());
 
         // Pass signals into simulator.
         simulator.update_lane_signals(signals);

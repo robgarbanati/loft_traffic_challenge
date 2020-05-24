@@ -6,7 +6,6 @@
 #include "clock.hpp"
 
 
-extern "C" {
 typedef struct _lane_t {
     const char name[11];
     unsigned int min_signal_time;
@@ -19,15 +18,14 @@ typedef struct _lane_t {
 typedef struct _traffic_state_t {
     const lane_t *current_lane;
     int lane_start_time;
-    const SensorState *sensors;
+    const SensorState *sensor_data;
     int sensors_size;
-    SignalState *signals;
+    SignalState *signal_data;
     int signals_size;
     int sim_time;
 } traffic_state_t;
 
-void controller_init(traffic_state_t *traffic_state);
-void controller_update(traffic_state_t traffic_state);
+void traffic_init(traffic_state_t *traffic_state, int sim_time);
+void controller_update(traffic_state_t *traffic_state, int sim_time);
 
-} // extern "C"
 #endif // CONTROLLER_HPP

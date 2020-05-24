@@ -20,7 +20,6 @@
 //===============================================================================================//
 #include "controller.hpp"
 
-extern "C" {
 //===============================================================================================//
 //===================================== Private Variables =======================================//
 //===============================================================================================//
@@ -81,31 +80,6 @@ static void turn_lane_green(const lane_t *current_lane, SignalState *signals) {
     printf("turn green: %d %d\n", signal0, signal1);
 }
 
-static void update_lane(const lane_t **current_lane_ptr, int sim_time,
-                        const SensorState sensor0, const SensorState sensor1, 
-                        SignalState *signals) {
-    const lane_t *current_lane = *current_lane_ptr;
-    static int lane_start_time = 0;
-    
-    bool max_time_elapsed = ((sim_time - lane_start_time) > current_lane->max_signal_time);
-    bool min_time_elapsed = ((sim_time - lane_start_time) > current_lane->min_signal_time);
-    bool both_sensors_are_clear = ( (sensor0 == SensorState::CLEAR) && 
-                                    (sensor1 == SensorState::CLEAR) );
-
-    // Has max time in current signal elapsed?
-    if( max_time_elapsed || (min_time_elapsed && both_sensors_are_clear) ) {
-        turn_lane_red(current_lane, signals);
-
-        *current_lane_ptr = current_lane->next_lane; // TODO make this a function that does more advanced switching logic.
-        current_lane = *current_lane_ptr;
-        turn_lane_green(current_lane, signals);
-
-        lane_start_time = sim_time;
-        printf("Switched to lane %s at time %d. min: %d, max: %d\n", current_lane->name, sim_time, current_lane->min_signal_time, current_lane->max_signal_time);
-
-    }
-}
-
 static void controller_init(void) {
     ns_turn.next_lane = &ns_through;
     ns_through.next_lane = &ew_turn;
@@ -118,13 +92,14 @@ static void controller_init(void) {
 //===============================================================================================//
 
 // TODO check if sensors are initialized.
-void traffic_init(traffic_state_t *traffic_state) {
+void traffic_init(traffic_state_t *traffic_state, int sim_time) {
     controller_init();
     traffic_state->current_lane = &ns_turn;
+    traffic_state->lane_start_time = sim_time;
     for(int i=0; i<traffic_state->signals_size; i++) {
-        traffic_state->signals[i] = SignalState::RED;
+        traffic_state->signal_data[i] = SignalState::RED;
     }
-    turn_lane_green(traffic_state->current_lane, traffic_state->signals);
+    turn_lane_green(traffic_state->current_lane, traffic_state->signal_data);
 }
 
 // Level 1: Follow traffic order.
@@ -132,31 +107,35 @@ void traffic_init(traffic_state_t *traffic_state) {
 // Level 3: Follow traffic order, skipping if sensor not present, extending if sensor still present.
 // Level 4: try to do something w.r.t. upper bound?
 // Stateless!
-void controller_update(traffic_state_t *traffic_state) {
-
+void controller_update(traffic_state_t *traffic_state, int sim_time) {
     // Extract info from struct.
     const lane_t *current_lane = traffic_state->current_lane;
-    SensorState sensor0 = traffic_state->sensors[current_lane->sensor_indices[0]];
-    SensorState sensor1 = traffic_state->sensors[current_lane->sensor_indices[1]];
-    int sim_time = traffic_state->sim_time;
+    SensorState sensor0 = traffic_state->sensor_data[current_lane->sensor_indices[0]];
+    SensorState sensor1 = traffic_state->sensor_data[current_lane->sensor_indices[1]];
     int lane_start_time = traffic_state->lane_start_time;
     
     // compute various lane switching indicators.
-    bool max_time_elapsed = ((sim_time - lane_start_time) > current_lane->max_signal_time);
-    bool min_time_elapsed = ((sim_time - lane_start_time) > current_lane->min_signal_time);
+    bool max_time_elapsed = ((sim_time - lane_start_time) >= current_lane->max_signal_time);
+    bool min_time_elapsed = ((sim_time - lane_start_time) >= current_lane->min_signal_time);
     bool both_sensors_are_clear = ( (sensor0 == SensorState::CLEAR) && 
                                     (sensor1 == SensorState::CLEAR) );
+    
+    //printf("sim_time: %d. lane_start_time: %d. min: %d. max: %d. bothclear? %d\n", 
+                //sim_time, lane_start_time, current_lane->min_signal_time, current_lane->max_signal_time, both_sensors_are_clear);
 
-    // Has max time in current signal elapsed?
+    // Is it time to switch lanes?
     if( max_time_elapsed || (min_time_elapsed && both_sensors_are_clear) ) {
-        turn_lane_red(traffic_state->current_lane, traffic_state->signals);
+        // Switch lanes.
+        
+        turn_lane_red(traffic_state->current_lane, traffic_state->signal_data);
 
         traffic_state->current_lane = current_lane->next_lane; // TODO make this a function that does more advanced switching logic.
-        turn_lane_green(traffic_state->current_lane, traffic_state->signals);
+
+        turn_lane_green(traffic_state->current_lane, traffic_state->signal_data);
 
         traffic_state->lane_start_time = sim_time;
+
         printf("Switched to lane %s at time %d. min: %d, max: %d\n", current_lane->name, sim_time, current_lane->min_signal_time, current_lane->max_signal_time);
     }
 } 
 
-} // extern "C"
