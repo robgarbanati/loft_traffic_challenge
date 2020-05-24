@@ -86,10 +86,10 @@ void Simulator::update_simulation
     // update simulation state from scenario
     sensors_ = scenario_timeslice->sensors;
 
-    printf("sensors_: ");
-    for (unsigned lane = 0; lane < Lane::COUNT; ++lane)
-    {
-        printf("%d ", sensors_[lane]);
-    }
-    puts("");
+    //printf("sensors_: ");
+    //for (unsigned lane = 0; lane < Lane::COUNT; ++lane)
+    //{
+        //printf("%d ", sensors_[lane]);
+    //}
+    //puts("");
 }

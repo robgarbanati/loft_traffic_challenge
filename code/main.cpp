@@ -27,10 +27,14 @@ int main
     char const *argv[]
 )
 {
-    Simulator simulator(SCENARIO_2);
+    Simulator simulator(SCENARIO_1);
     auto &clock = simulator.clock();
     auto &sensors = simulator.sensors();
-    controller_init();
+
+    traffic_state_t traffic_state;
+    traffic_state.sensors = sensors.data();
+    traffic_init(&traffic_state);
+
 
     std::cout << simulator.BANNER << std::endl;
 
@@ -45,18 +49,10 @@ int main
         const SensorState *c_sensors = sensors.data();
 
         // Pass sensors into controller. Get signals from controller.
-        TrafficSignals testsignals;
-        for (unsigned lane = 0; lane < Lane::COUNT; ++lane)
-        {
-            testsignals[lane] = SignalState::YELLOW;
-        }
-        SignalState *c_signals = testsignals.data();
-        c_signals = controller_update(c_sensors, sensors.size(), c_signals, testsignals.size(), clock.now());
-
-        // Convert c_signals to signals somehow.
+        controller_update(c_sensors, sensors.size(), c_signals, signals.size(), clock.now());
 
         // Pass signals into simulator.
-        simulator.update_lane_signals(testsignals);
+        simulator.update_lane_signals(signals);
 
         // Let simulator print simulator state.
         std::cout << simulator << std::endl;
