@@ -81,7 +81,6 @@ static void turn_lane_red(const lane_t *current_lane, SignalState *signals) {
 
     signals[signal0] = SignalState::RED;
     signals[signal1] = SignalState::RED;
-    //printf("turn red: %d %d\n", signal0, signal1);
 }
 
 static void turn_lane_green(const lane_t *current_lane, SignalState *signals) {
@@ -90,7 +89,6 @@ static void turn_lane_green(const lane_t *current_lane, SignalState *signals) {
 
     signals[signal0] = SignalState::GREEN;
     signals[signal1] = SignalState::GREEN;
-    //printf("turn green: %d %d\n", signal0, signal1);
 }
 
 static void switch_to_lane(traffic_state_t *traffic_state, const lane_t *new_lane, int sim_time) {
@@ -120,7 +118,6 @@ static const lane_t *find_next_lane_with_set_sensors(traffic_state_t *traffic_st
 
     // Search through linked-list for next lane with set sensors.
     while(1) {
-        //printf("new_lane is %p. current_lane is %p\n", new_lane, traffic_state->current_lane);
         //CHECK(new_lane != traffic_state->current_lane, "controller looped through all lanes and didn't find any with sensors set.");
         
         SensorState sensor0 = traffic_state->sensor_data[new_lane->sensor_indices[0]];
@@ -135,6 +132,17 @@ static const lane_t *find_next_lane_with_set_sensors(traffic_state_t *traffic_st
             return new_lane;
         }
     }
+}
+
+static bool are_all_sensors_clear(traffic_state_t *traffic_state) {
+    // look for any SET sensors in sensor_data
+    for(int i=0; i<traffic_state->sensors_size; i++) {
+        if(traffic_state->sensor_data[i] == SensorState::SET) {
+            return false;
+        }
+    }
+    // couldn't find any SET sensors, so return true.
+    return true;
 }
 
 
@@ -176,22 +184,14 @@ void controller_update(traffic_state_t *traffic_state, int sim_time) {
 
     // Is it time to switch lanes?
     if( max_time_elapsed || (min_time_elapsed && both_sensors_are_clear) ) {
-        // are all sensors clear?
-        bool all_sensors_clear = true;
-        for(int i=0; i<traffic_state->sensors_size; i++) {
-            if(traffic_state->sensor_data[i] == SensorState::SET) {
-                all_sensors_clear = false;
-                break;
-            }
-        }
         // if all sensors are clear, favor ns_through
-        if(all_sensors_clear) {
+        if(are_all_sensors_clear(traffic_state)) {
             switch_to_lane(traffic_state, &ns_through, sim_time);
 
         } else { // otherwise, seek next lane in rotation with set sensors.
-            // Switch lanes.
             const lane_t *new_lane = find_next_lane_with_set_sensors(traffic_state, sim_time);
 
+            // but don't bother 'switching' to same lane we're already in.
             if(new_lane != traffic_state->current_lane) {
                 switch_to_lane(traffic_state, new_lane, sim_time);
             }
